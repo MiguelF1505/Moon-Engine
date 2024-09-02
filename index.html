@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+
+<html>
+	<head>
+		<title>Engine</title>
+		<link rel="icon" type="image/x-icon" href="./images/icon.png">
+	</head>
+	
+	<style>
+		canvas{
+			padding: 0;
+			margin: auto;
+			border: 0px black;
+			background-color: white;
+			display: block;
+			image-rendering: pixelated;
+			image-rendering: crisp-edges;
+			image-rendering: -webkit-optimize-contrast;
+			-ms-interpolation-mode: nearest-neighbor;
+		}
+		body{
+			background-color: black;
+			overflow: hidden;
+		}
+	</style>
+	
+	<body>
+		<canvas id="c" onmousemove="OnMouseMove(event)"></canvas>
+		<script src="./main.js" id="main"></script>
+	</body>
+</html>
