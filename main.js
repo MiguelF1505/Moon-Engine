@@ -33,6 +33,12 @@ mainPathImg = mainPathImg.src;
 var renderCols = true;
 var persistantData = [0, 1]; // ? ; master volume
 
+function isMobile(){
+	const userAgent = navigator.userAgent;
+
+	return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+}
+
 function RngInt(min, max) {
 	return Math.floor(Math.random() * (max - min + 1) ) + min;
 }
@@ -111,11 +117,12 @@ class obj{
 		this.width = width;
 		this.height = height;
 		this.id = Objects.length;
+		this.enabled = true;
 		Objects.push(this);
 	}
 	
 	update(){
-		if(this.par != null){
+		if(this.par != null && this.enabled){
 			this.par.update();
 		}
 	}
@@ -192,7 +199,7 @@ class Sprite extends obj{
 		let halfX = this.nWidth / 2;
 		let halfY = this.nHeight / 2;
 		
-		if(x - halfX > (1000 + halfX) * CamSize || y - halfY > (600 + halfY) * CamSize || x + halfX < -(halfX + 500) * CamSize || y + halfY < -halfY * CamSize * CamSize){
+		if(x - halfX > 1000 * CamSize || y - halfY > 600 * CamSize || x + halfX < -1000 * (CamSize - 1) || y + halfX < -300 * (CamSize - 1)){
 			return;
 		}
 		
@@ -281,7 +288,7 @@ class Collider{
 	}
 	
 	CheckForCollisions(compareTag, retPar){
-		let Size = canvas.width / 1000;
+		let Size = 1;
 		let ret = null;
 		let halfX = this.width / 2 * Size;
 		let halfY = this.height / 2 * Size;
@@ -299,10 +306,10 @@ class Collider{
 			OHalfX = Colliders[i].width / 2 * Size;
 			OHalfY = Colliders[i].height / 2 * Size;
 			if(compareTag == null || compareTag == Colliders[i].tag && Colliders[i] != this){
-				if(x + halfX >= checkX - OHalfX && x - halfX <= checkX + OHalfX){
-					if(y + halfY >= checkY - OHalfY && y - halfY <= checkY + OHalfY){
+				if(x + halfX > checkX - OHalfX && x - halfX < checkX + OHalfX){
+					if(y + halfY > checkY - OHalfY && y - halfY < checkY + OHalfY){
 						if(retPar == false){
-							ret = Colliders[i].id;
+							ret = Colliders[i];
 						}else{
 							ret = Colliders[i].par;								
 						}
@@ -318,7 +325,7 @@ class Collider{
 	CheckAllCollisions(compareTag){
 		let colls = [];
 		
-		let Size = canvas.width / 1000;
+		let Size = 1;
 		let ret = null;
 		let halfX = this.width / 2 * Size;
 		let halfY = this.height / 2 * Size;
@@ -337,8 +344,8 @@ class Collider{
 			OHalfY = Colliders[i].height / 2 * Size;
 			
 			if(compareTag == null || compareTag == Colliders[i].tag && Colliders[i] != this){
-				if(x + halfX >= checkX - OHalfX && x - halfX <= checkX + OHalfX){
-					if(y + halfY >= checkY - OHalfY && y - halfY <= checkY + OHalfY){
+				if(x + halfX > checkX - OHalfX && x - halfX < checkX + OHalfX){
+					if(y + halfY > checkY - OHalfY && y - halfY < checkY + OHalfY){
 						colls.push(Colliders[i]);
 					}
 				}
@@ -351,56 +358,90 @@ class Collider{
 
 class MyMouse{
 	
-	constructor(HitboxSize){
+	constructor(HitboxSize, mouseId){
 		this.x = 0;
 		this.y = 0;
+		this.mouseId = mouseId;
 		this.isOnUi = false;
-		this.col = new Collider(0, 0, HitboxSize, HitboxSize, "mouse", this);
+		this.col = new Collider(0, 0, HitboxSize, HitboxSize, 'mouse', this);
 	}
 }
 
-const mouse = new MyMouse(2);
+const mouses = [new MyMouse(2, 0), new MyMouse(2, 1), new MyMouse(2, 2), new MyMouse(2, 3)];
 
 //do not call this
-function OnMouseMove(event){
-	if(mouse != null){
-		mouse.x = event.clientX - ((window.innerWidth - canvas.width) / 2);
-		mouse.y = event.clientY;
+function OnMouseMove(event, mouseId){
+	if(mouses[mouseId] != null){
+
+		let changeX = 0;
+		let changeY = 0;
+
+		if(isMobile()){
+			changeX = event.touches[mouseId].clientX;
+			changeY = event.touches[mouseId].clientY;
+		}else{
+			changeX = event.clientX;
+			changeY = event.clientY;
+		}
+
+		mouses[mouseId].x = changeX - ((window.innerWidth - canvas.width) / 2);
+		mouses[mouseId].y = changeY;
 		let scale = canvas.width / 1000;
 		
-		mouse.x /= scale;
-		mouse.y /= scale;
+		mouses[mouseId].x /= scale;
+		mouses[mouseId].y /= scale;
 		
-		//mouse.x += CamX;
-		//mouse.y += CamY;
+		//mouses[0].x += CamX;
+		//mouses[0].y += CamY;
 		
-		mouse.col.x = mouse.x - 500;
-		mouse.col.y = mouse.y - 300;
+		mouses[mouseId].col.x = mouses[mouseId].x - 500;
+		mouses[mouseId].col.y = mouses[mouseId].y - 300;
 	}
 }
 
 class Button extends obj{
-	constructor(x, y, width, height, imgId, buttonId, callBack){
+	constructor(x, y, width, height, imgId, buttonId, callBack, extraCallbacks, isMobile){
 		super(x, y, width, height);
 		this.par = this;
 		this.imgIdx = SprFind("UI/buttons/" + imgId);
 		this.buttonId = buttonId;
+		this.extraCallbacks = extraCallbacks;
 		this.col = new Collider(this.position.x, this.position.y, this.width, this.height, "button", this);
 		this.callBack = callBack;
+		this.isMobile = isMobile;
 		//pressing
 		this.p = false;
+		this.hovering = false;
+		this.mouseIdTouching = 0;
 	}
 	
 	update(){
-		if(this.col.CheckForCollisions('mouse', true) != null){
-			if(!MPLF[0] && MP[0]){
+		if(this.isMobile && !isMobile()){
+			return false;
+		}
+
+		const mouseObj = this.col.CheckForCollisions('mouse', true);
+
+		if(mouseObj != null){
+			this.mouseIdTouching = mouseObj.mouseId;
+			this.hovering = true;
+			if(this.extraCallbacks){
+				this.callBack.OnHover(this.buttonId);
+			}
+			if(!MPLF[this.mouseIdTouching] && MP[this.mouseIdTouching]){
 				this.p = true;
-			}else if(this.p && !MP[0]){
+			}else if(this.p && !MP[this.mouseIdTouching]){
 				this.callBack.OnClick(this.buttonId);
 				this.p = false;
 			}
-		}else if(!MP[0]){
+		}else if(!MP[this.mouseIdTouching]){
 			this.p = false;
+		}
+		if((!MP[this.mouseIdTouching] || mouseObj == null) && this.hovering){
+			this.hovering = false;
+			if(this.extraCallbacks){
+				this.callBack.OnStopHover(this.buttonId);
+			}
 		}
 		addDrawRequest(this, 5000);
 	}
@@ -437,7 +478,7 @@ class MenuScene{
 	}
 	
 	ui(){
-		RenderNumber(Math.floor(musicManager.timerMusic * 100), 100, 100, 50, true);
+		//RenderNumber(Math.floor(musicManager.timerMusic * 100), 100, 100, 50, true);
 	}
 }
 
@@ -448,6 +489,10 @@ class GameScene{
 	
 	start(){
 		player = new Player(0, 0, 30, 30);
+		new Collider(0, 200, 500, 25, 'wall', this);
+		new Button(350, 200, 85, 55, 'up', 0, this, true, true);
+		new Button(-430, 200, 85, 55, 'left', 1, this, true, true);
+		new Button(-330, 200, 85, 55, 'right', 3, this, true, true);
 	}
 	
 	update(){
@@ -457,6 +502,22 @@ class GameScene{
 	ui(){
 
 	}
+
+	OnHover(idButton){
+		if(idButton <= 3){
+			PK[inputs[idButton]] = true;
+		}
+	}
+
+	OnStopHover(idButton){
+		if(idButton <= 3){
+			PK[inputs[idButton]] = false;
+		}
+	}
+
+	OnClick(idButton){
+		
+	}
 	
 }
 
@@ -464,12 +525,69 @@ class Player extends obj{
 	constructor(x, y, width, height){
 		super(x, y, width, height);
 		this.col = new Collider(x, y, width, height, 'player', this);
+		this.colFeet = new Collider(x, y + height * 0.5, width * 0.9, 2, 'feetP', this);
 		this.spr = new Sprite(x, y, width, height, 'BG');
+		this.vel = {x: 0, y: 0};
+		this.gravity = 900;
+		this.speed = 300;
+		this.jumpForce = 430;
+		this.minSpeed = 30;
 	}
 	
-	update(){
+	moveX(moveAmm){
+		moveAmm = Math.abs(moveAmm) > this.col.width * 2 ? (moveAmm > 0 ? this.col.width * 2 : -this.col.width * 2) : moveAmm;
+		let oldX = this.position.x;
 		this.col.x = this.position.x;
+		this.col.x += moveAmm;
+		let wall;
+		while(this.col.CheckForCollisions('wall', true)){
+			wall = this.col.CheckForCollisions('wall', false);
+			if(oldX > wall.x){
+				this.col.x = wall.x + wall.width * 0.5 + this.col.width * 0.5;
+			}else{
+				this.col.x = wall.x - wall.width * 0.5 - this.col.width * 0.5;
+			}
+		}
+		this.position.x = this.col.x;
+	}
+
+	moveY(moveAmm){
+		moveAmm = Math.abs(moveAmm) > this.col.height * 2 ? (moveAmm > 0 ? this.col.height * 2 : -this.col.height * 2) : moveAmm;
+		let oldY = this.position.y;
 		this.col.y = this.position.y;
+		this.col.y += moveAmm;
+		let wall;
+		while(this.col.CheckForCollisions('wall', true)){
+			this.vel.y = 0;
+			wall = this.col.CheckForCollisions('wall', false);
+			if(oldY > wall.y){
+				this.col.y = wall.y + wall.height * 0.5 + this.col.height * 0.5;
+			}else{
+				this.col.y = wall.y - wall.height * 0.5 - this.col.height * 0.5;
+			}
+		}
+		this.position.y = this.col.y;
+	}
+
+	update(){
+		this.vel.y += this.gravity * dt;
+		let directionX = PK[inputs[3]] - PK[inputs[1]];
+		if(directionX == 0){
+			this.vel.x = this.vel.x * 0.25;
+			this.vel.x = Math.abs(this.vel.x) <= this.minSpeed ? 0 : this.vel.x;
+		}else{
+			this.vel.x = directionX * this.speed;
+		}
+		if(this.colFeet.CheckForCollisions('wall') != null && PK[inputs[0]]){
+			this.vel.y = -this.jumpForce;
+		}
+		if(!PK[inputs[0]] && this.vel.y < -140){
+			this.vel.y = -140;
+		}
+		this.moveX(this.vel.x * dt);
+		this.moveY(this.vel.y * dt);
+		this.colFeet.x = this.position.x;
+		this.colFeet.y = this.position.y + this.col.height * 0.5;
 		addDrawRequest(this, 5);
 	}
 	
@@ -559,7 +677,7 @@ function PlaySound(soundPath, volumeAmm){
 	audio.pause();
 	audio.currentTime = 0;
 	soundsMult[id]++;
-	if(soundsMult[id] > 3){
+	if(soundsMult[id] > 2){
 		soundsMult[id] = 0;
 	}
 	if(volumeAmm == undefined){
@@ -632,11 +750,17 @@ function update(){
 		}
 		Objects = [];
 		for(let i = 0; i < Colliders.length; i++){
-			if(Colliders[i].tag != "mouse"){
+			if(Colliders[i].tag != 'mouse'){
 				deleteCollider(i);
 			}
 		}
-		Colliders = [Colliders[0]];
+		let mousesCol = [];
+
+		for(let i = 0; i < mouses.length; i++){
+			mousesCol.push(mouses[i].col);
+		}
+
+		Colliders = mousesCol;
 		
 		if(scene == -1){
 			scene = oldScene;
@@ -716,6 +840,9 @@ function loadImages(){
 	loadImg("UI/loadBar");
 	loadImg("icon");
 	loadImg("UI/buttons/BG");
+	loadImg("UI/buttons/left");
+	loadImg("UI/buttons/up");
+	loadImg("UI/buttons/right");
 	loadImg("BG");
 
 	for(let i = 0; i < Alphabet.length; i++){
@@ -959,9 +1086,11 @@ function loadSound(soundPath){
 	}
 	soundsSrc.push(soundPath);
 	soundsMult.push(0);
-	needed++;
+	needed += soundRedundancy - 1;
 
-	sounds[sounds.length - 1][soundRedundancy - 1].oncanplay = function(){ loaded++; }
+	for(let i = 0; i < soundRedundancy; i++){
+		sounds[sounds.length - 1][i].oncanplay = function(){ loaded++; }
+	}
 
 	return sounds[sounds.length - 1][0];
 }
@@ -1017,5 +1146,47 @@ window.onkeydown = function(e) { PK[e.keyCode] = 1; }
 	
 window.onmouseup = function(e) { MP[e.button] = false}
 window.onmousedown = function(e) { MP[e.button] = true}
+
+document.addEventListener('touchstart', function(event) {
+	//event.preventDefault();
+	if (isMobile()) {
+	  if(clicks > 1){
+		for (let i = 0; i < event.touches.length; i++) {
+			const touch = event.touches[i];
+			const mouseId = touch.identifier;
+			if (mouseId !== null) {
+			  OnMouseMove(event, mouseId);
+			  MP[mouseId] = true;
+			}
+		  }
+	  }
+	  clicks++;
+	}
+  });
+  
+  document.addEventListener('touchmove', function(event) {
+	if (isMobile()) {
+	  for (let i = 0; i < event.touches.length; i++) {
+		const touch = event.touches[i];
+		const mouseId = touch.identifier;
+		if (mouseId !== null) {
+		  OnMouseMove(event, mouseId);
+		}
+	  }
+	}
+  });
+  
+  document.addEventListener('touchend', function(event) {
+	for (let i = 0; i < event.changedTouches.length; i++) {
+	  const touch = event.changedTouches[i];
+	  const mouseId = touch.identifier;
+	  if (mouseId !== null) {
+		MP[mouseId] = false;
+	  }
+	}
+});
+  
+
+var clicks = 0;
 
 loadImages();
