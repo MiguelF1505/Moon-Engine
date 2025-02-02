@@ -13,7 +13,6 @@ var dt = 0;
 var CamX = 0;
 var CamY = 0;
 var CamSize = 1;
-const soundRedundancy = 3;
 //used for sprite rotations
 const Radians = Math.PI / 180;
 var Colliders = [];
@@ -30,14 +29,6 @@ canvas.addEventListener('contextmenu', event => event.preventDefault());
 var mainPathImg = new Image();
 mainPathImg.src = "./images/";
 mainPathImg = mainPathImg.src;
-var renderCols = true;
-var persistantData = [0, 1]; // ? ; master volume
-
-function isMobile(){
-	const userAgent = navigator.userAgent;
-
-	return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
-}
 
 function RngInt(min, max) {
 	return Math.floor(Math.random() * (max - min + 1) ) + min;
@@ -83,16 +74,12 @@ function RenderNumber(num, x, y, size, centered){
 		xS -= (numstring.length - 1) * size * 0.5;
 	}
 	
-	let letId = numsImg[10];
-	let imgFind = imgs[letId];
+	let letId = 0;
 	let nw;
 	let nh;
-
-	if(num < 0){
-		renderUi(xS, y, size, size, letId);
-	}
-
-	for(let i = num < 0 ? 1 : 0; i < numstring.length; i++){
+	let imgFind;
+	
+	for(let i = 0; i < numstring.length; i++){
 		letId = numsImg[parseInt(numstring[i])];
 		imgFind = imgs[letId];
 		nw = imgFind.naturalWidth;
@@ -117,12 +104,11 @@ class obj{
 		this.width = width;
 		this.height = height;
 		this.id = Objects.length;
-		this.enabled = true;
 		Objects.push(this);
 	}
 	
 	update(){
-		if(this.par != null && this.enabled){
+		if(this.par != null){
 			this.par.update();
 		}
 	}
@@ -130,7 +116,7 @@ class obj{
 	destroy(){
 		if(this.par != null){
 			this.par.destroy();
-			this.par = null;
+			delete this.par;
 		}
 	}
 }
@@ -161,6 +147,7 @@ class Sprite extends obj{
 		this.OfY = 1;
 		this.brightness = 1;
 		this.ghost = 1;
+		this.enabled = true;
 	}
 	
 	changeSprite(imgId, done){
@@ -185,6 +172,9 @@ class Sprite extends obj{
 	update(){}
 
 	draw(){
+		if(!this.enabled){
+			return;
+		}
 		let x = this.position.x - CamX + 500;
 		let y = this.position.y - CamY + 300;
 		
@@ -199,7 +189,7 @@ class Sprite extends obj{
 		let halfX = this.nWidth / 2;
 		let halfY = this.nHeight / 2;
 		
-		if(x - halfX > 1000 * CamSize || y - halfY > 600 * CamSize || x + halfX < -1000 * (CamSize - 1) || y + halfX < -300 * (CamSize - 1)){
+		if(x - halfX > (1000 + halfX) * CamSize || y - halfY > (600 + halfY) * CamSize || x + halfX < -(halfX + 500) * CamSize || y + halfY < -halfY * CamSize * CamSize){
 			return;
 		}
 		
@@ -208,7 +198,7 @@ class Sprite extends obj{
 		
 		ctx.save();
 		
-		if(this.brightness != 1 && this.ghost != 1){
+		if(this.brightness + this.ghost != 2){
 			ctx.filter = 'brightness(' + this.brightness + ')' + 'opacity(' + this.ghost + ')';
 		}
 		
@@ -221,25 +211,13 @@ class Sprite extends obj{
 			yc = -1;
 		}
 		
-		
 		ctx.scale(xc, yc);
 		ctx.translate(Math.floor((x + (500 * (CamSize - 1))) * SizeCanvas), Math.floor(y + (300 * (CamSize - 1))) * SizeCanvas);
 		
 		ctx.rotate(this.rotation * Radians);
 		
-		/*
 		ctx.drawImage(this.img, Math.floor(-halfX * SizeCanvas * this.OfX), Math.floor(-halfY * SizeCanvas * this.OfY),
 		Math.floor(this.nWidth * SizeCanvas), Math.floor(this.nHeight * SizeCanvas));
-		*/
-
-		halfX = (-halfX * SizeCanvas * this.OfX) + ((-halfX * SizeCanvas * this.OfX) < 0 ? -1 : 0) >> 0;
-		halfY = (-halfY * SizeCanvas * this.OfY) + ((-halfY * SizeCanvas * this.OfY) < 0 ? -1 : 0) >> 0;
-
-		let nWidth = (this.nWidth * SizeCanvas) + ((this.nWidth * SizeCanvas) < 0 ? -1 : 0) >> 0;
-		let nHeight = (this.nHeight * SizeCanvas) + ((this.nHeight * SizeCanvas) < 0 ? -1 : 0) >> 0;
-
-		ctx.drawImage(this.img, halfX, halfY, nWidth, nHeight);
-		//ctx.drawImage(this.img, halfX, halfY, 100, 100);
 		
 		ctx.restore();
 	}
@@ -288,7 +266,7 @@ class Collider{
 	}
 	
 	CheckForCollisions(compareTag, retPar){
-		let Size = 1;
+		let Size = canvas.width / 1000;
 		let ret = null;
 		let halfX = this.width / 2 * Size;
 		let halfY = this.height / 2 * Size;
@@ -306,10 +284,10 @@ class Collider{
 			OHalfX = Colliders[i].width / 2 * Size;
 			OHalfY = Colliders[i].height / 2 * Size;
 			if(compareTag == null || compareTag == Colliders[i].tag && Colliders[i] != this){
-				if(x + halfX > checkX - OHalfX && x - halfX < checkX + OHalfX){
-					if(y + halfY > checkY - OHalfY && y - halfY < checkY + OHalfY){
+				if(x + halfX >= checkX - OHalfX && x - halfX <= checkX + OHalfX){
+					if(y + halfY >= checkY - OHalfY && y - halfY <= checkY + OHalfY){
 						if(retPar == false){
-							ret = Colliders[i];
+							ret = Colliders[i].id;
 						}else{
 							ret = Colliders[i].par;								
 						}
@@ -325,7 +303,7 @@ class Collider{
 	CheckAllCollisions(compareTag){
 		let colls = [];
 		
-		let Size = 1;
+		let Size = canvas.width / 1000;
 		let ret = null;
 		let halfX = this.width / 2 * Size;
 		let halfY = this.height / 2 * Size;
@@ -344,8 +322,8 @@ class Collider{
 			OHalfY = Colliders[i].height / 2 * Size;
 			
 			if(compareTag == null || compareTag == Colliders[i].tag && Colliders[i] != this){
-				if(x + halfX > checkX - OHalfX && x - halfX < checkX + OHalfX){
-					if(y + halfY > checkY - OHalfY && y - halfY < checkY + OHalfY){
+				if(x + halfX >= checkX - OHalfX && x - halfX <= checkX + OHalfX){
+					if(y + halfY >= checkY - OHalfY && y - halfY <= checkY + OHalfY){
 						colls.push(Colliders[i]);
 					}
 				}
@@ -358,89 +336,58 @@ class Collider{
 
 class MyMouse{
 	
-	constructor(HitboxSize, mouseId){
+	constructor(HitboxSize){
 		this.x = 0;
 		this.y = 0;
-		this.mouseId = mouseId;
 		this.isOnUi = false;
-		this.col = new Collider(0, 0, HitboxSize, HitboxSize, 'mouse', this);
+		this.col = new Collider(0, 0, HitboxSize, HitboxSize, "mouse", this);
 	}
 }
 
-const mouses = [new MyMouse(2, 0), new MyMouse(2, 1), new MyMouse(2, 2), new MyMouse(2, 3)];
+const mouse = new MyMouse(2);
 
 //do not call this
-function OnMouseMove(event, mouseId){
-	if(mouses[mouseId] != null){
-
-		let changeX = 0;
-		let changeY = 0;
-
-		if(isMobile()){
-			changeX = event.touches[mouseId].clientX;
-			changeY = event.touches[mouseId].clientY;
-		}else{
-			changeX = event.clientX;
-			changeY = event.clientY;
-		}
-
-		mouses[mouseId].x = changeX - ((window.innerWidth - canvas.width) / 2);
-		mouses[mouseId].y = changeY;
+function OnMouseMove(event){
+	if(mouse != null){
+		mouse.x = event.clientX - ((window.innerWidth - canvas.width) / 2);
+		mouse.y = event.clientY;
 		let scale = canvas.width / 1000;
 		
-		mouses[mouseId].x /= scale;
-		mouses[mouseId].y /= scale;
+		mouse.x /= scale;
+		mouse.y /= scale;
 		
-		//mouses[0].x += CamX;
-		//mouses[0].y += CamY;
+		//mouse.x += CamX;
+		//mouse.y += CamY;
 		
-		mouses[mouseId].col.x = mouses[mouseId].x - 500;
-		mouses[mouseId].col.y = mouses[mouseId].y - 300;
+		mouse.col.x = mouse.x - 500;
+		mouse.col.y = mouse.y - 300;
 	}
 }
 
 class Button extends obj{
-	constructor(x, y, width, height, imgId, buttonId, callBack, extraCallbacks, isMobile){
+	constructor(x, y, width, height, imgId, buttonId, callBack){
 		super(x, y, width, height);
 		this.par = this;
 		this.imgIdx = SprFind("UI/buttons/" + imgId);
 		this.buttonId = buttonId;
-		this.extraCallbacks = extraCallbacks;
 		this.col = new Collider(this.position.x, this.position.y, this.width, this.height, "button", this);
-		this.callBack = callBack;
-		this.isMobile = isMobile;
-		//pressing
+		this.t = 0;
 		this.p = false;
-		this.hovering = false;
-		this.mouseIdTouching = 0;
+		this.callback = callBack;
 	}
 	
 	update(){
-		if(this.isMobile && !isMobile()){
-			return false;
-		}
-
-		const mouseObj = this.col.CheckForCollisions('mouse', true);
-
-		if(mouseObj != null){
-			this.mouseIdTouching = mouseObj.mouseId;
-			this.hovering = true;
-			if(this.extraCallbacks){
-				this.callBack.OnHover(this.buttonId);
-			}
-			if(!MPLF[this.mouseIdTouching] && MP[this.mouseIdTouching]){
+		if(this.col.CheckForCollisions('mouse', true) != null){
+			if(!MPLF[0] && MP[0]){
 				this.p = true;
-			}else if(this.p && !MP[this.mouseIdTouching]){
-				this.callBack.OnClick(this.buttonId);
+			}
+			if(MPLF[0] && this.p){
+				this.callback.onClick(this.buttonId);
 				this.p = false;
 			}
-		}else if(!MP[this.mouseIdTouching]){
-			this.p = false;
-		}
-		if((!MP[this.mouseIdTouching] || mouseObj == null) && this.hovering){
-			this.hovering = false;
-			if(this.extraCallbacks){
-				this.callBack.OnStopHover(this.buttonId);
+		}else{
+			if(!MP[0]){
+				this.p = false;
 			}
 		}
 		addDrawRequest(this, 5000);
@@ -448,7 +395,7 @@ class Button extends obj{
 	
 	draw(){
 		this.t += dt;
-		renderUi(this.position.x, this.position.y, this.width, this.height, this.imgIdx);
+		renderUi(this.position.x + (Math.cos(this.t * 0.2) * this.width / 15), this.position.y + (Math.sin(this.t * 0.38) * this.width / 15), this.width, this.height, this.imgIdx);
 	}
 	
 	destroy(){
@@ -458,16 +405,17 @@ class Button extends obj{
 
 class MenuScene{
 	constructor(){
-
+		
 	}
 	
 	start(){
-		new Button(0, 0, 50, 50, 'BG', 0, this);
+		new Button(0, 0, 50, 50, 'Pause', 0, this);
 		CamX = 0;
 		CamY = 0;
+		gameSpeed = 1;
 	}
 	
-	OnClick(buttonId){
+	onClick(buttonId){
 		if(buttonId == 0){
 			scene = 1;
 		}
@@ -478,7 +426,7 @@ class MenuScene{
 	}
 	
 	ui(){
-		//RenderNumber(Math.floor(musicManager.timerMusic * 100), 100, 100, 50, true);
+		
 	}
 }
 
@@ -488,35 +436,184 @@ class GameScene{
 	}
 	
 	start(){
-		player = new Player(0, 0, 30, 30);
-		new Collider(0, 200, 500, 25, 'wall', this);
-		new Button(350, 200, 85, 55, 'up', 0, this, true, true);
-		new Button(-430, 200, 85, 55, 'left', 1, this, true, true);
-		new Button(-330, 200, 85, 55, 'right', 3, this, true, true);
+		this.simSpeed = 4;
+		new Button(-450, -250, 50, 50, 'Pause', 0, this);
+		new Button(-375, -250, 50, 50, 'Resume', 1, this);
+		this.cells = [this.newCell(0, 0), this.newCell(0, 1), this.newCell(0, -1)];
+		this.nextCells = [];
+		this.killCells = [];
+		this.delay = 0;
+		let clickX = 0;
+		let clickY = 0;
+		gameSpeed = 4.5;
+	}
+	
+	newCell(x1, y1){
+		return {x: x1, y: y1};
+	}
+	
+	onClick(buttonClicked){
+		if(buttonClicked == 0){
+			this.simSpeed = 0;
+		}else if(buttonClicked == 1){
+			this.simSpeed = gameSpeed;
+		}
+	}
+	
+	getNearPosition(x, y){
+		let nearMe = 0;
+		for(let i = 0; i < this.cells.length; i++){
+			if(!(this.cells[i].x == x && this.cells[i].y == y)){
+				if(this.cells[i].x == x - 1 || this.cells[i].x == x + 1 || this.cells[i].x == x){
+					if(this.cells[i].y == y - 1 || this.cells[i].y == y + 1 || this.cells[i].y == y){
+						nearMe++;
+					}
+				}
+			}
+		}
+		
+		return nearMe;
+	}
+	
+	hasThere(x, y){
+		for(let i = 0; i < this.cells.length; i++){
+			if(x == this.cells[i].x && y == this.cells[i].y){
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	getThere(x, y){
+		for(let i = 0; i < this.cells.length; i++){
+			if(x == this.cells[i].x && y == this.cells[i].y){
+				return this.cells[i];
+			}
+		}
+		return null;
+	}
+	
+	willBeThere(x, y){
+		for(let i = 0; i < this.nextCells.length; i++){
+			if(x == this.nextCells[i].x && y == this.nextCells[i].y){
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	simulateCell(cell, pos){
+		let nearMe = this.getNearPosition(cell.x, cell.y);
+		
+		for(let x = -1 ; x < 2; x++){
+			for(let y = -1; y < 2; y++){
+				if(!this.hasThere(cell.x + x, cell.y + y)){
+					let nearThis = this.getNearPosition(cell.x + x, cell.y + y);
+					if((!this.willBeThere(cell.x + x, cell.y + y) && nearThis == 3)){
+						this.nextCells.push({x: cell.x + x, y: cell.y + y});
+					}
+				}
+			}
+		}
+		
+		if(nearMe < 2 || nearMe > 3){
+			this.killCells.push(cell);
+		}
 	}
 	
 	update(){
-
+		CamX += (PK[68] - PK[65]) * -400 * dt;
+		CamY += (PK[83] - PK[87]) * -400 * dt;
+		this.delay += dt * this.simSpeed;
+		
+		if(this.delay >= 1){
+			this.delay--;
+			for(let i = 0; i < this.cells.length; i++){
+				this.simulateCell(this.cells[i], i);
+			}
+			
+			let AAA = this.nextCells.length;
+			for(let i = 0; i < AAA; i++){
+				this.cells.push(Clone(this.nextCells[0]));
+				this.nextCells.splice(0, 1);
+			}
+			
+			let AAAAA = this.killCells.length;
+			for(let i = 0; i < AAAAA; i++){
+				for(let a = 0; a < this.cells.length; a++){
+					if(this.cells[a] == this.killCells[0]){
+						this.cells.splice(a, 1);
+						this.killCells.splice(0, 1);
+						i--;
+					}
+				}
+			}
+		}else{
+			let xDif = (450 + CamX) * CamSize;
+			let yDif = (250 + CamY) * CamSize;
+			if(MP[0] && !MPLF[0]){
+				this.clickX = this.GetPosInAx((mouse.x * CamSize) - xDif);
+				this.clickY = this.GetPosInAx((mouse.y * CamSize) - yDif);
+			}
+			if(!MP[0] && MPLF[0] && mouse.col.CheckForCollisions("button", true) == null){
+				if(this.GetPosInAx((mouse.x * CamSize) - xDif) == this.clickX && this.GetPosInAx((mouse.y * CamSize) - yDif) == this.clickY){
+					if(!this.hasThere(this.clickX, this.clickY)){
+						this.cells.push(this.newCell(this.clickX, this.clickY));
+					}else{
+						this.killCells.push(this.getThere(this.clickX, this.clickY));
+						let AAAAA = this.killCells.length;
+						for(let i = 0; i < AAAAA; i++){
+								for(let a = 0; a < this.cells.length; a++){
+									if(this.cells[a] == this.killCells[0]){
+										this.cells.splice(a, 1);
+										this.killCells.splice(0, 1);
+										i--;
+									}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	GetPosInAx(pos){
+		let mult = 1;
+		if(pos < 0){
+			mult = -1;
+		}
+		
+		if(mult == -1){
+			return Math.ceil(Math.abs(pos) / 50) * mult;
+		}else{
+			return Math.floor(Math.abs(pos) / 50) * mult;
+		}
 	}
 	
 	ui(){
-
-	}
-
-	OnHover(idButton){
-		if(idButton <= 3){
-			PK[inputs[idButton]] = true;
+		for(let x = -1; x < Math.ceil(39 * CamSize); x++){
+			for(let y = 0; y < Math.ceil(11 * CamSize); y++){
+				ctx.beginPath();
+				ctx.strokeStyle = '#f0f';
+				let cx = ((CamX / CamSize) - (Math.floor(CamX / 50 / CamSize) * 50));
+				let cy = ((CamY / CamSize) - (Math.floor(CamY / 50 / CamSize) * 50));
+				ctx.moveTo(((x * 50) + cx) * (canvas.width / 1000) / CamSize, ((y - 6) * 50 + cy) * (canvas.width / 1000) / CamSize);
+				ctx.lineTo(((x * 50) + cx) * (canvas.width / 1000) / CamSize, ((y - 6) * 50 + 1200 + cy) * (canvas.width / 1000) / CamSize);
+				ctx.stroke();
+				
+				for(let i = 0; i < 2; i++){
+					ctx.beginPath();
+					ctx.strokeStyle = '#f0f';
+					ctx.moveTo((x * 50 + cx) * (canvas.width / 1000) / CamSize, (((y * 2) + i) * 50 + cy) * (canvas.width / 1000) / CamSize);
+					ctx.lineTo(((x * 50) + cx + 2000) * (canvas.width / 1000) / CamSize, (((y * 2) + i) * 50 + cy) * (canvas.width / 1000) / CamSize);
+					ctx.stroke();
+				}
+			}
 		}
-	}
-
-	OnStopHover(idButton){
-		if(idButton <= 3){
-			PK[inputs[idButton]] = false;
-		}
-	}
-
-	OnClick(idButton){
 		
+		for(let i = 0; i < this.cells.length; i++){
+			renderUi((this.cells[i].x * 50 / CamSize) - (25 / CamSize) + (CamX / CamSize), (this.cells[i].y * 50 - 25 + CamY) / CamSize, 45 / CamSize, 45 / CamSize, SprFind("UI/buttons/BG"));
+		}
 	}
 	
 }
@@ -524,77 +621,14 @@ class GameScene{
 class Player extends obj{
 	constructor(x, y, width, height){
 		super(x, y, width, height);
-		this.col = new Collider(x, y, width, height, 'player', this);
-		this.colFeet = new Collider(x, y + height * 0.5, width * 0.9, 2, 'feetP', this);
-		this.spr = new Sprite(x, y, width, height, 'BG');
-		this.vel = {x: 0, y: 0};
-		this.gravity = 900;
-		this.speed = 300;
-		this.jumpForce = 430;
-		this.minSpeed = 30;
 	}
 	
-	moveX(moveAmm){
-		moveAmm = Math.abs(moveAmm) > this.col.width * 2 ? (moveAmm > 0 ? this.col.width * 2 : -this.col.width * 2) : moveAmm;
-		let oldX = this.position.x;
-		this.col.x = this.position.x;
-		this.col.x += moveAmm;
-		let wall;
-		while(this.col.CheckForCollisions('wall', true)){
-			wall = this.col.CheckForCollisions('wall', false);
-			if(oldX > wall.x){
-				this.col.x = wall.x + wall.width * 0.5 + this.col.width * 0.5;
-			}else{
-				this.col.x = wall.x - wall.width * 0.5 - this.col.width * 0.5;
-			}
-		}
-		this.position.x = this.col.x;
-	}
-
-	moveY(moveAmm){
-		moveAmm = Math.abs(moveAmm) > this.col.height * 2 ? (moveAmm > 0 ? this.col.height * 2 : -this.col.height * 2) : moveAmm;
-		let oldY = this.position.y;
-		this.col.y = this.position.y;
-		this.col.y += moveAmm;
-		let wall;
-		while(this.col.CheckForCollisions('wall', true)){
-			this.vel.y = 0;
-			wall = this.col.CheckForCollisions('wall', false);
-			if(oldY > wall.y){
-				this.col.y = wall.y + wall.height * 0.5 + this.col.height * 0.5;
-			}else{
-				this.col.y = wall.y - wall.height * 0.5 - this.col.height * 0.5;
-			}
-		}
-		this.position.y = this.col.y;
-	}
-
 	update(){
-		this.vel.y += this.gravity * dt;
-		let directionX = PK[inputs[3]] - PK[inputs[1]];
-		if(directionX == 0){
-			this.vel.x = this.vel.x * 0.25;
-			this.vel.x = Math.abs(this.vel.x) <= this.minSpeed ? 0 : this.vel.x;
-		}else{
-			this.vel.x = directionX * this.speed;
-		}
-		if(this.colFeet.CheckForCollisions('wall') != null && PK[inputs[0]]){
-			this.vel.y = -this.jumpForce;
-		}
-		if(!PK[inputs[0]] && this.vel.y < -140){
-			this.vel.y = -140;
-		}
-		this.moveX(this.vel.x * dt);
-		this.moveY(this.vel.y * dt);
-		this.colFeet.x = this.position.x;
-		this.colFeet.y = this.position.y + this.col.height * 0.5;
-		addDrawRequest(this, 5);
+
 	}
 	
 	draw(){
-		this.spr.position.x = this.position.x;
-		this.spr.position.y = this.position.y;
-		this.spr.draw();
+
 	}
 
 	destroy(){
@@ -651,7 +685,7 @@ function renderAll(){
 
 function deleteObject(idx){
 	Objects[idx].destroy();
-	Objects[idx] = null;
+	delete Objects[idx];
 	Objects.splice(idx, 1);
 	for(let i = idx; i < Objects.length; i++){
 		Objects[i].id--;
@@ -659,7 +693,10 @@ function deleteObject(idx){
 }
 
 function deleteCollider(idx){
-	Colliders[idx] = null;
+	if(Colliders[idx].par != null){
+		delete Colliders[idx].par;
+	}
+	delete Colliders[idx];
 	Colliders.splice(idx, 1);
 	for(let i = idx; i < Colliders.length; i++){
 		Colliders[i].id--;
@@ -677,13 +714,13 @@ function PlaySound(soundPath, volumeAmm){
 	audio.pause();
 	audio.currentTime = 0;
 	soundsMult[id]++;
-	if(soundsMult[id] > 2){
+	if(soundsMult[id] > 3){
 		soundsMult[id] = 0;
 	}
 	if(volumeAmm == undefined){
-		audio.volume = 1  * persistantData[1];
+		audio.volume = 1;
 	}else{
-		audio.volume = volumeAmm  * persistantData[1];
+		audio.volume = volumeAmm;
 	}
 	audio.play();
 	return audio;
@@ -692,11 +729,10 @@ function PlaySound(soundPath, volumeAmm){
 function mainStart(){
 	Scenes = [new MenuScene(), new GameScene()];
 	ctx.imageSmoothingEnabled = false;
-
+	
 	for(let a = 0; a < 10; a++){
 		numsImg.push(SprFind("Text/" + a));
 	}
-	numsImg.push(SprFind("Text/-"));
 	
 	for(let a = 0; a < Alphabet.length; a++){
 		if(Alphabet[a] != ' '){
@@ -750,17 +786,11 @@ function update(){
 		}
 		Objects = [];
 		for(let i = 0; i < Colliders.length; i++){
-			if(Colliders[i].tag != 'mouse'){
+			if(Colliders[i].tag != "mouse"){
 				deleteCollider(i);
 			}
 		}
-		let mousesCol = [];
-
-		for(let i = 0; i < mouses.length; i++){
-			mousesCol.push(mouses[i].col);
-		}
-
-		Colliders = mousesCol;
+		Colliders = [Colliders[0]];
 		
 		if(scene == -1){
 			scene = oldScene;
@@ -773,9 +803,7 @@ function update(){
 	oldTime = now;
 	renderAll();
 	Scenes[scene].ui();
-	if(renderCols){
-		RenderCols();
-	}
+	//RenderCols();
 	requestAnimationFrame(update);
 	
 	/*frChange += dt;
@@ -839,12 +867,12 @@ function RenderCols(){
 function loadImages(){
 	loadImg("UI/loadBar");
 	loadImg("icon");
-	loadImg("UI/buttons/BG");
-	loadImg("UI/buttons/left");
-	loadImg("UI/buttons/up");
-	loadImg("UI/buttons/right");
 	loadImg("BG");
-
+	
+	loadImg("UI/buttons/Pause");
+	loadImg("UI/buttons/Resume");
+	loadImg("UI/buttons/BG");
+	
 	for(let i = 0; i < Alphabet.length; i++){
 		if(Alphabet[i] != ' '){
 			loadImg("Text/" + Alphabet[i]);
@@ -898,201 +926,59 @@ function Clone(original){
 class MusicManger{
 	constructor(musicStart){
 		this.oldMusic = musicStart;
-		music = musicStart;
-		this.musicsNeeded = musics.length;
-
-		for(let i = 0; i < musics.length; i++){
-			let audio = loadSound("music/" + musics[i].src);
-			audio.oncanplay = function(){musicManager.onLoadSound(audio)};
-		}
-
 		//this.aud = PlaySound(musics[musicStart].src);
-		this.musicStart = musicStart;
+		
 		this.localOldTime = Date.now();
 		this.dt = this.localOldTime - Date.now();
-		this.timerOff = 1;
+		this.timerOff = 0;
 		this.timerOn = 0;
-		this.timerMusic = 0;
+		if(musics[musicStart] == null){
+			this.timerMusic = 0;
+			return;
+		}
+		this.timerMusic = musics[musicStart].time;
 		//pressed mouse once
 		this.pmo = false;
-		this.sideMusics = [];
-		//this.addSideMusic(1);
-	}
-
-	addSideMusic(id, volume){
-		for(let i = 0; i < this.sideMusics.length; i++){
-			if(this.sideMusics[i].id == id){
-				return false;
-			}
-		}
-
-		let time = this.aud.currentTime - (Math.floor(this.aud.currentTime / musics[id].time) * musics[id].time);
-		this.sideMusics.push({aud: null, id: id, time: time, remove: false, removeTimer: 1, volume: isNaN(volume) ? 1 : volume});
-
-		return true;
-	}
-
-	removeSideMusic(id){
-		for(let i = 0; i < this.sideMusics.length; i++){
-			if(this.sideMusics[i].id == id){
-				this.sideMusics[i].remove = true;
-				break;
-			}
-		}
-	}
-
-	onLoadSound(audio){
-		this.musicsNeeded--;
-		if(this.musicsNeeded <= 0){
-			for(let i = 0; i < musics.length; i++){
-				musics[i].time = sounds[getSoundId("music/" + musics[i].src)][0].duration;
-			}
-			this.timerMusic = musics[this.musicStart].time;
-		}
 	}
 	
 	update(){
-		this.dt = Date.now() - this.localOldTime;
-		this.dt *= 0.001;
-		let rate = musicSpeed * gameSpeed;
-
-		if(rate < 0.1 && rate != 0){
-			rate = 0.1;
-		}
-		if(rate > 10){
-			rate = 10;
-		}
-
-		if(this.timerOff > 0){
-			this.timerOff -= dt;
-		}else{
-			this.timerOff = 0;
-		}
-
 		for(let i = 0; i < MP.length; i++){
 			if(MP[i] == 1){
 				this.pmo = true;
 			}
 		}
 		
+		if(musics[music] == null){
+			return;
+		}
+		
 		if(!this.pmo){
 			return;
 		}
-
-		if(musics[music] == null){
-			if(this.aud != null){
-				this.aud.currentTime = 0;
-				this.aud.pause();
-				if(music == -1){
-					music = this.oldMusic;
-					this.oldMusic = -1;
-					this.aud.currentTime = 0;
-					this.timerMusic = 0;
-					this.aud.currentTime = 0;
-					this.aud.playbackRate = musicSpeed;
-					this.timerOff = 1;
-				}
-			}
-			return;
-		}
-
-		//this.timerMusic += this.dt * musicSpeed * gameSpeed;
-		this.timerMusic += this.dt * rate;
+		this.dt = Date.now() - this.localOldTime;
+		this.dt *= 0.001;
+		this.timerMusic += this.dt;
 		if(music != this.oldMusic){
-			if(music >= 0 && this.oldMusic != -1){
-				this.timerOn += this.dt * rate;
-				if(this.timerOn >= 1){
-					this.timerOn = 0
-					this.oldMusic = music;
-					if(this.aud != null){
-						this.aud.pause();
-					}
-					this.timerMusic = musics[this.oldMusic].time;
-				}
-			}else if(this.oldMusic == -1){
-				this.oldMusic = music;
-				this.timerMusic = musics[this.oldMusic].time;
+			this.oldMusic = music;
+			if(this.aud != null){
+				this.aud.volume = 0;
+				delete this.aud;
 			}
+			this.timerMusic = musics[music].time;
 		}
 		
-		let restarMusic = this.timerMusic >= musics[this.oldMusic].time;
-		if(this.aud != null)
-			this.timerMusic = this.aud.currentTime;
-
-		if(restarMusic){
+		if(this.timerMusic >= musics[this.oldMusic].time){
 			this.timerMusic = 0;
-			if(this.aud != null){this.aud.pause();}
-			this.aud = PlaySound("music/" + musics[this.oldMusic].src, musicVolume * musics[music].myVolume);
-			this.aud.currentTime = 0;
+			this.aud = PlaySound(musics[this.oldMusic].src);
 		}
-		
-		if(this.aud != null){
-			let newVolume = (musicVolume * musics[this.oldMusic].myVolume * persistantData[1]) - this.timerOff - this.timerOn;
-
-			if(newVolume > 1){
-				newVolume = 1;
-			}else if(newVolume < 0){
-				newVolume = 0;
-			}
-
-			for(let elId = 0; elId < this.sideMusics.length; elId++){
-				let element = this.sideMusics[elId];
-
-				if(!element.remove && element.removeTimer > 0){
-					element.removeTimer -= this.dt;
-					if(element.removeTimer < 0){
-						element.removeTimer = 0;
-					}
-				}else if(element.remove){
-					element.removeTimer += this.dt;
-					if(element.removeTimer >= 1){
-						element.aud.pause();
-						this.sideMusics.splice(elId, 1);
-						elId--;
-						continue;
-					}
-				}
-
-				let volumeElement = ((musicVolume * musics[element.id].myVolume * persistantData[1]) * element.volume) - element.removeTimer;
-
-				element.time += this.dt * rate;
-				if(element.time >= musics[element.id].time){
-					element.aud.pause();
-					element.aud = null;
-				}
-				if(element.aud == null){
-					element.time = this.timerMusic - (Math.floor(this.timerMusic / musics[element.id].time) * musics[element.id].time)
-					element.aud = PlaySound("music/" + musics[element.id].src, 1);
-					element.aud.currentTime = element.time;
-				}else{
-					element.aud.volume = volumeElement;
-					element.aud.playbackRate = rate;
-				}
-			}
-
-			this.aud.playbackRate = rate;
-			
-			this.aud.volume = newVolume;
-		}
-		
 		this.localOldTime = Date.now();
 	}
 }
 
 function loadSound(soundPath){
-	sounds.push([]);
-	for(let i = 0; i < soundRedundancy; i++){
-		sounds[sounds.length - 1].push(new Audio("./sounds/" + soundPath));
-	}
+	sounds.push([new Audio("./sounds/" + soundPath), new Audio("./sounds/" + soundPath), new Audio("./sounds/" + soundPath), new Audio("./sounds/" + soundPath)]);
 	soundsSrc.push(soundPath);
 	soundsMult.push(0);
-	needed += soundRedundancy - 1;
-
-	for(let i = 0; i < soundRedundancy; i++){
-		sounds[sounds.length - 1][i].oncanplay = function(){ loaded++; }
-	}
-
-	return sounds[sounds.length - 1][0];
 }
 
 function getSoundId(soundPath){
@@ -1104,8 +990,10 @@ function getSoundId(soundPath){
 	return 0;
 }
 
-var musicSpeed = 1;
-var musicVolume = 1;
+//{src: "PATH", time: 1}
+const musics = [];
+const musicManager = new MusicManger(0);
+
 var music = 0;
 var imgs = [];
 var loaded = 0;
@@ -1118,75 +1006,12 @@ var sounds = [];
 var soundsSrc = [];
 var soundsMult = [];
 
-//{src: "PATH", myVolume: 1, time: 0}
-const musics = [
-	{src: "thxCheese.mp3", myVolume: 1, time: 0},
-	{src: "testCombo.mp3", myVolume: 1, time: 0}
-];
-const musicManager = new MusicManger(0);
-
-var minimized = false;
 var gameSpeed = 1;
-
-document.addEventListener("visibilitychange", function() {
-	if(document.hidden){
-		minimized = true;
-		musicManager.aud.playbackRate = 0;
-		musicManager.sideMusics.forEach(element => {
-			element.aud.playbackRate = 0;
-		});
-	}else{
-		musicManager.localOldTime = Date.now();
-		minimized = false;
-	}
-}, false);
 
 window.onkeyup = function(e) { PK[e.keyCode] = 0; }
 window.onkeydown = function(e) { PK[e.keyCode] = 1; }
 	
 window.onmouseup = function(e) { MP[e.button] = false}
 window.onmousedown = function(e) { MP[e.button] = true}
-
-document.addEventListener('touchstart', function(event) {
-	//event.preventDefault();
-	if (isMobile()) {
-	  if(clicks > 1){
-		for (let i = 0; i < event.touches.length; i++) {
-			const touch = event.touches[i];
-			const mouseId = touch.identifier;
-			if (mouseId !== null) {
-			  OnMouseMove(event, mouseId);
-			  MP[mouseId] = true;
-			}
-		  }
-	  }
-	  clicks++;
-	}
-  });
-  
-  document.addEventListener('touchmove', function(event) {
-	if (isMobile()) {
-	  for (let i = 0; i < event.touches.length; i++) {
-		const touch = event.touches[i];
-		const mouseId = touch.identifier;
-		if (mouseId !== null) {
-		  OnMouseMove(event, mouseId);
-		}
-	  }
-	}
-  });
-  
-  document.addEventListener('touchend', function(event) {
-	for (let i = 0; i < event.changedTouches.length; i++) {
-	  const touch = event.changedTouches[i];
-	  const mouseId = touch.identifier;
-	  if (mouseId !== null) {
-		MP[mouseId] = false;
-	  }
-	}
-});
-  
-
-var clicks = 0;
 
 loadImages();
