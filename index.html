@@ -2,7 +2,7 @@
 
 <html>
 	<head>
-		<title>Engine</title>
+		<title>Moon Engine- Game Of Life</title>
 		<link rel="icon" type="image/x-icon" href="./images/icon.png">
 	</head>
 	
@@ -14,9 +14,6 @@
 			background-color: white;
 			display: block;
 			image-rendering: pixelated;
-			image-rendering: crisp-edges;
-			image-rendering: -webkit-optimize-contrast;
-			-ms-interpolation-mode: nearest-neighbor;
 		}
 		body{
 			background-color: black;
@@ -25,7 +22,7 @@
 	</style>
 	
 	<body>
-		<canvas id="c" onmousemove="OnMouseMove(event, 0)"></canvas>
+		<canvas id="c" onmousemove="OnMouseMove(event)"></canvas>
 		<script src="./main.js" id="main"></script>
 	</body>
 </html>
